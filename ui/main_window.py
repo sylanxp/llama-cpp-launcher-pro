@@ -194,9 +194,12 @@ class MainWindow(QMainWindow):
     def browse_dir(self, key):
         start_path = self.controls[key].text()
         browser = DirectoryBrowser(start_path, self)
-        if browser.exec():
-            path = browser.directory_selected
+        
+        def on_selected(path):
             self.controls[key].setText(path)
+        
+        browser.directory_selected.connect(on_selected)
+        browser.exec()
 
     def append_log(self, text, level="INFO"):
         # 简单的彩色高亮逻辑
