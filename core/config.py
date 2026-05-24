@@ -1,5 +1,6 @@
-import json
 import os
+import sys
+import glob
 
 class ConfigManager:
     """
@@ -8,8 +9,8 @@ class ConfigManager:
     def __init__(self, config_file="config.json"):
         self.config_file = config_file
         self.defaults = {
-            "llama_dir": "",
-            "model_dir": "",
+            "llama_dir": self._get_default_drive(),
+            "model_dir": self._get_default_drive(),
             "main_model": "",
             "vision_model": "",
             "ctx_size": 4096,
@@ -33,13 +34,34 @@ class ConfigManager:
         }
         self.config = self.load_config()
 
+    def _get_default_drive(self):
+        """自动检测程序所在盘符作为默认路径"""
+        try:
+            if getattr(sys, 'frozen', False):
+                # 打包后的 .exe 环境
+                exe_path = sys.executable
+                return os.path.splitdrive(exe_path)[0] + "\\"
+            else:
+                # 开发环境（脚本运行）
+                script_path = os.path.abspath(__file__)
+                return os.path.splitdrive(script_path)[0] + "\\"
+        except Exception:
+            return "C:\\"
+
+    def scan_gguf_files(self, directory):
+        """扫描指定目录下的所有 .gguf 文件"""
+        gguf_files = []
+        if directory and os.path.isdir(directory):
+            pattern = os.path.join(directory, "**", "*.gguf")
+            gguf_files = glob.glob(pattern, recursive=True)
+        return gguf_files
+
     def load_config(self):
         """加载配置，如果文件不存在则使用默认值"""
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # 合并默认值，防止升级后缺少新字段
                     full_config = self.defaults.copy()
                     full_config.update(data)
                     return full_config

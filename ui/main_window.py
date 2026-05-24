@@ -19,7 +19,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Llama.cpp Launcher Pro")
         self.setMinimumSize(900, 700)
         
-        # 初始化核心组件
         self.config_mgr = ConfigManager()
         self.hw_info = HardwareInfo()
         self.proc_mgr = ProcessManager(self.append_log)
@@ -27,7 +26,6 @@ class MainWindow(QMainWindow):
         self.init_ui()
         self.update_hw_display()
         
-        # 硬件自动刷新定时器 (每 5 秒)
         self.hw_timer = QTimer()
         self.hw_timer.timeout.connect(self.update_hw_display)
         self.hw_timer.start(5000)
@@ -68,14 +66,59 @@ class MainWindow(QMainWindow):
         config_container = QWidget()
         config_grid = QGridLayout(config_container)
         config_grid.setSpacing(10)
-        
-        # 定义控件映射 (标签, 键, 控件类型, 默认值/选项)
-        # 类型: 'text', 'int', 'bool', 'combo'
+
+        self.controls = {}
+
+        # 第一行：Llama.cpp 目录 (带浏览)
+        row = 0
+        lbl = QLabel("Llama.cpp 目录")
+        ctrl = QLineEdit()
+        btn_browse = QPushButton("浏览")
+        btn_browse.setFixedWidth(60)
+        btn_browse.clicked.connect(lambda: self.browse_dir("llama_dir"))
+        hbox = QHBoxLayout()
+        hbox.addWidget(ctrl)
+        hbox.addWidget(btn_browse)
+        config_grid.addWidget(lbl, row, 0)
+        config_grid.addLayout(hbox, row, 1)
+        self.controls["llama_dir"] = ctrl
+
+        # 第二行：模型目录 (带浏览，选择后自动扫描 .gguf)
+        row = 1
+        lbl = QLabel("模型目录")
+        ctrl = QLineEdit()
+        btn_browse = QPushButton("浏览")
+        btn_browse.setFixedWidth(60)
+        btn_browse.clicked.connect(lambda: self.browse_and_scan_models())
+        hbox = QHBoxLayout()
+        hbox.addWidget(ctrl)
+        hbox.addWidget(btn_browse)
+        config_grid.addWidget(lbl, row, 0)
+        config_grid.addLayout(hbox, row, 1)
+        self.controls["model_dir"] = ctrl
+
+        # 第三行：主模型 (下拉选择)
+        row = 2
+        lbl = QLabel("主模型")
+        ctrl = QComboBox()
+        ctrl.setEditable(True)
+        ctrl.setPlaceholderText("请先选择模型目录...")
+        config_grid.addWidget(lbl, row, 0)
+        config_grid.addWidget(ctrl, row, 1)
+        self.controls["main_model"] = ctrl
+
+        # 第四行：视觉模型 (下拉选择)
+        row = 3
+        lbl = QLabel("视觉模型")
+        ctrl = QComboBox()
+        ctrl.setEditable(True)
+        ctrl.setPlaceholderText("请先选择模型目录...")
+        config_grid.addWidget(lbl, row, 0)
+        config_grid.addWidget(ctrl, row, 1)
+        self.controls["vision_model"] = ctrl
+
+        # 其他参数：两列网格
         fields = [
-            ("Llama.cpp 目录", "llama_dir", "text", ""),
-            ("模型目录", "model_dir", "text", ""),
-            ("主模型", "main_model", "text", ""),
-            ("视觉模型", "vision_model", "text", ""),
             ("Context Size", "ctx_size", "int", 4096),
             ("GPU Layers (ngl)", "ngl", "int", 99),
             ("CPU Threads", "threads", "int", 4),
@@ -96,43 +139,38 @@ class MainWindow(QMainWindow):
             ("Flash Attention", "flash_attn", "bool", True),
         ]
 
-        self.controls = {}
+        start_row = 4
         for i, (label_text, key, ctrl_type, default) in enumerate(fields):
-            row, col = divmod(i, 2)
+            row = start_row + i // 2
+            col = i % 2
             
             lbl = QLabel(label_text)
             ctrl = None
             
             if ctrl_type == "text":
                 ctrl = QLineEdit()
-                btn_browse = QPushButton("浏览")
-                btn_browse.setFixedWidth(60)
-                btn_browse.clicked.connect(lambda checked, k=key: self.browse_dir(k))
-                
-                hbox = QHBoxLayout()
-                hbox.addWidget(ctrl)
-                hbox.addWidget(btn_browse)
-                config_grid.addWidget(lbl, row, col*2)
-                config_grid.addLayout(hbox, row, col*2 + 1)
+                config_grid.addWidget(lbl, row, col * 2)
+                config_grid.addWidget(ctrl, row, col * 2 + 1)
                 
             elif ctrl_type == "int":
                 ctrl = QSpinBox()
                 ctrl.setRange(0, 1000000)
-                config_grid.addWidget(lbl, row, col*2)
-                config_grid.addWidget(ctrl, row, col*2 + 1)
+                config_grid.addWidget(lbl, row, col * 2)
+                config_grid.addWidget(ctrl, row, col * 2 + 1)
                 
             elif ctrl_type == "bool":
                 ctrl = QCheckBox()
-                config_grid.addWidget(lbl, row, col*2)
-                config_grid.addWidget(ctrl, row, col*2 + 1)
+                config_grid.addWidget(lbl, row, col * 2)
+                config_grid.addWidget(ctrl, row, col * 2 + 1)
                 
             elif ctrl_type == "combo":
                 ctrl = QComboBox()
                 ctrl.addItems(default)
-                config_grid.addWidget(lbl, row, col*2)
-                config_grid.addWidget(ctrl, row, col*2 + 1)
+                config_grid.addWidget(lbl, row, col * 2)
+                config_grid.addWidget(ctrl, row, col * 2 + 1)
             
-            self.controls[key] = ctrl
+            if ctrl:
+                self.controls[key] = ctrl
 
         config_scroll.setWidget(config_container)
         main_layout.addWidget(config_scroll)
@@ -141,7 +179,6 @@ class MainWindow(QMainWindow):
         bottom_frame = QFrame()
         bottom_layout = QVBoxLayout(bottom_frame)
         
-        # 按钮行
         btn_layout = QHBoxLayout()
         self.btn_start = QPushButton("🚀 启动服务")
         self.btn_start.setFixedHeight(40)
@@ -156,7 +193,6 @@ class MainWindow(QMainWindow):
         btn_layout.addWidget(self.btn_stop)
         bottom_layout.addLayout(btn_layout)
         
-        # 日志窗口
         self.log_window = QPlainTextEdit()
         self.log_window.setReadOnly(True)
         self.log_window.setPlaceholderText("服务日志将在此显示...")
@@ -168,6 +204,11 @@ class MainWindow(QMainWindow):
         
         # 加载保存的配置
         self.load_config_to_ui()
+        
+        # 如果已有模型目录，自动扫描模型
+        saved_model_dir = self.controls["model_dir"].text()
+        if saved_model_dir:
+            self.scan_and_fill_models(saved_model_dir)
 
     def load_config_to_ui(self):
         for key, ctrl in self.controls.items():
@@ -201,30 +242,82 @@ class MainWindow(QMainWindow):
         browser.directory_selected.connect(on_selected)
         browser.exec()
 
+    def browse_and_scan_models(self):
+        """选择模型目录后自动扫描 .gguf 文件"""
+        start_path = self.controls["model_dir"].text()
+        browser = DirectoryBrowser(start_path, self)
+        
+        def on_selected(path):
+            self.controls["model_dir"].setText(path)
+            self.scan_and_fill_models(path)
+        
+        browser.directory_selected.connect(on_selected)
+        browser.exec()
+
+    def scan_and_fill_models(self, directory):
+        """扫描目录并填充主模型和视觉模型下拉框"""
+        if not directory or not os.path.isdir(directory):
+            return
+        
+        gguf_files = self.config_mgr.scan_gguf_files(directory)
+        
+        if not gguf_files:
+            self.append_log(f"模型目录下未找到 .gguf 文件: {directory}", "WARN")
+            return
+        
+        # 提取相对路径（相对于模型目录）
+        model_names = []
+        for f in gguf_files:
+            rel_path = os.path.relpath(f, directory)
+            model_names.append(rel_path)
+        
+        # 保存当前选中的值
+        current_main = self.controls["main_model"].currentText()
+        current_vision = self.controls["vision_model"].currentText()
+        
+        # 填充主模型下拉框
+        combo_main = self.controls["main_model"]
+        combo_main.clear()
+        combo_main.addItems(model_names)
+        
+        # 填充视觉模型下拉框
+        combo_vision = self.controls["vision_model"]
+        combo_vision.clear()
+        combo_vision.addItem("")  # 空选项表示不使用视觉模型
+        combo_vision.addItems(model_names)
+        
+        # 恢复之前选中的值
+        if current_main and current_main in model_names:
+            combo_main.setCurrentText(current_main)
+        if current_vision and current_vision in model_names:
+            combo_vision.setCurrentText(current_vision)
+        
+        self.append_log(f"已扫描到 {len(model_names)} 个 .gguf 模型文件", "INFO")
+
     def append_log(self, text, level="INFO"):
-        # 简单的彩色高亮逻辑
-        color = "#d4d4d4" # Default
+        color = "#d4d4d4"
         if level == "ERROR": color = "#f44336"
         elif level == "WARN": color = "#ffeb3b"
-        elif level == "SYS": color = "#9c27b0" # 紫色高亮
+        elif level == "SYS": color = "#9c27b0"
         elif level == "INFO": color = "#4caf50"
         
-        # 使用 HTML 格式插入日志
         self.log_window.appendHtml(f'<span style="color: {color};">{text}</span>')
         self.log_window.moveCursor(QTextCursor.End)
 
     def handle_start(self):
-        # 1. 保存 UI 配置到内存
         updated_config = {}
         for key, ctrl in self.controls.items():
-            if isinstance(ctrl, QLineEdit): updated_config[key] = ctrl.text()
-            elif isinstance(ctrl, QSpinBox): updated_config[key] = ctrl.value()
-            elif isinstance(ctrl, QCheckBox): updated_config[key] = ctrl.isChecked()
-            elif isinstance(ctrl, QComboBox): updated_config[key] = ctrl.currentText()
+            if isinstance(ctrl, QLineEdit):
+                updated_config[key] = ctrl.text()
+            elif isinstance(ctrl, QSpinBox):
+                updated_config[key] = ctrl.value()
+            elif isinstance(ctrl, QCheckBox):
+                updated_config[key] = ctrl.isChecked()
+            elif isinstance(ctrl, QComboBox):
+                updated_config[key] = ctrl.currentText()
         
         self.config_mgr.save_config(updated_config)
         
-        # 2. 启动进程
         if self.proc_mgr.start(updated_config):
             self.btn_start.setEnabled(False)
             self.btn_start.setText("运行中...")
