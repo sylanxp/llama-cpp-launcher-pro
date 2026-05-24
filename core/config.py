@@ -1,6 +1,7 @@
 import os
 import sys
 import glob
+import json
 
 class ConfigManager:
     """
@@ -9,28 +10,38 @@ class ConfigManager:
     def __init__(self, config_file="config.json"):
         self.config_file = config_file
         self.defaults = {
+            # 路径
             "llama_dir": self._get_default_drive(),
             "model_dir": self._get_default_drive(),
             "main_model": "",
             "vision_model": "",
+            # 基础参数
             "ctx_size": 4096,
             "ngl": 99,
             "threads": 4,
-            "batch": 512,
-            "ubatch": 512,
-            "np": 1,
-            "cache_k": "f16",
-            "cache_v": "f16",
-            "img_tokens": 1024,
             "port": 8080,
             "listen_mode": "local",
             "custom_host": "127.0.0.1",
-            "extra_args": "",
+            "np": 1,
+            "img_tokens": 1024,
+            # 性能优化
+            "batch": 512,
+            "ubatch": 512,
+            "cache_k": "f16",
+            "cache_v": "f16",
+            # 高级参数
+            "flash_attn": True,
+            "mlock": False,
+            "cont_batching": True,
+            "mmap": False,
+            "no_kv_offload": False,
+            "tensor_split": "",
+            # 自动重启
             "auto_restart": False,
             "detect_method": "api",
             "restart_interval": 3,
-            "mlock": False,
-            "flash_attn": True
+            # 额外参数
+            "extra_args": "",
         }
         self.config = self.load_config()
 
@@ -38,11 +49,9 @@ class ConfigManager:
         """自动检测程序所在盘符作为默认路径"""
         try:
             if getattr(sys, 'frozen', False):
-                # 打包后的 .exe 环境
                 exe_path = sys.executable
                 return os.path.splitdrive(exe_path)[0] + "\\"
             else:
-                # 开发环境（脚本运行）
                 script_path = os.path.abspath(__file__)
                 return os.path.splitdrive(script_path)[0] + "\\"
         except Exception:
