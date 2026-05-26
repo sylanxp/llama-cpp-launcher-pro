@@ -103,21 +103,24 @@ class ProcessManager(QObject):
                 cmd.extend(["--mmproj", vision_path])
                 self.log_signal.emit(f"视觉模型: {vision_path}", "INFO")
 
-        # 性能优化参数
-        if config.get("flash_attn"):
+        # ===== 性能优化参数 =====
+        # 新版 llama-server: --flash-attn [on|off|auto]，不要裸用
+        if config.get("flash_attn", True):
             cmd.append("--flash-attn")
+            cmd.append("on")
         
         # 智能 mlock：自动重启模式下移除 mlock 以提高成功率
         if not config.get("auto_restart") and config.get("mlock"):
             cmd.append("--mlock")
 
-        # 缓存类型
+        # 缓存类型（必须放在 --flash-attn 之后，否则会被吞掉）
         cmd.extend(["--cache-type-k", config.get("cache_k", "f16")])
         cmd.extend(["--cache-type-v", config.get("cache_v", "f16")])
 
-        # llama.cpp 额外高级参数
-        if config.get("mmap", True):
-            cmd.append("--no-mmap")  # 注意：--no-mmap 时禁用 mmap
+        # 高级参数
+        # mmap 在 UI 中是 "Disable mmap" 复选框，勾选 = 禁用 = 传 --no-mmap
+        if config.get("mmap", False):
+            cmd.append("--no-mmap")
         
         if config.get("cont_batching", True):
             cmd.append("--cont-batching")
